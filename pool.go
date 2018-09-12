@@ -1,5 +1,9 @@
 package pool
 
+import (
+	"sync"
+)
+
 // 定义别名
 type Job func()
 
@@ -59,6 +63,8 @@ func newDispatcher(workerPool chan *worker, jobQueue chan Job) *dispatcher {
 		worker := newWorker(workerPool)
 		worker.start()
 	}
+	// 发起调度
+	go dispatcher.dispatch()
 	return dispatcher
 }
 
@@ -91,9 +97,10 @@ type Pool struct {
 	JobQueue chan Job
 	// 调度器
 	dispatcher *dispatcher
+	wg         sync.WaitGroup
 }
 
-// 初始化线程池
+// 初始化线程池 （当性能逼满的时候，workerNum就是go协程的上限）
 func NewPool(workerNum int, jobQueueLen int) (pool *Pool) {
 	workerPool := make(chan *worker, workerNum)
 	jobQueue := make(chan Job, jobQueueLen)
@@ -109,4 +116,19 @@ func (p *Pool) Release() {
 	p.dispatcher.stop <- true
 	// 同样为了确保dispatcher资源已经全部释放
 	<-p.dispatcher.stop
+}
+
+// 这个pool执行多少次任务才会结束
+func (p *Pool) WaitCount(count int) {
+	p.wg.Add(count)
+}
+
+// pool已经完成一次任务
+func (p *Pool) JobDone() {
+	p.wg.Done()
+}
+
+// 等待任务执行次数达到设定的任务数
+func (p *Pool) WaitAll() {
+	p.wg.Wait()
 }

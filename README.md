@@ -3,11 +3,11 @@
 
 轻量级 Goroutine 线程池
 
-learn by https://godoc.org/github.com/ivpusic/grpool
+learn by https://github.com/ivpusic/grpool
 
 
 ## Docs
-https://godoc.org/github.com/gamefu/pool
+https://github.com/github.com/gamefu/pool
 
 ## Installation
 ```
@@ -59,26 +59,24 @@ import (
 )
 
 func main() {
-  // number of workers, and size of job queue
   pool := grpool.NewPool(100, 50)
   defer pool.Release()
 
-  // how many jobs we should wait
+  // 需要执行多少次任务才会结束
   pool.WaitCount(10)
 
-  // submit one or more jobs to pool
   for i := 0; i < 10; i++ {
     count := i
 
     pool.JobQueue <- func() {
-      // say that job is done, so we can know how many jobs are finished
+      // 执行完一次任务
       defer pool.JobDone()
 
       fmt.Printf("hello %d\n", count)
     }
   }
 
-  // wait until we call JobDone for all jobs
+  // 任务执行完之前会一直等待挂起
   pool.WaitAll()
 }
 ```
