@@ -11,7 +11,8 @@ type Job func()
 type worker struct {
 	workerPool chan *worker
 	jobChannel chan Job
-	stop       chan bool
+	// 因为struct不占用任何内存空间
+	stop chan struct{}
 }
 
 func newWorker(workerPool chan *worker) *worker {
@@ -19,7 +20,7 @@ func newWorker(workerPool chan *worker) *worker {
 		workerPool: workerPool,
 		// 用来接收传过来的job， 一个协程一次只能处理一个job
 		jobChannel: make(chan Job),
-		stop:       make(chan bool),
+		stop:       make(chan struct{}),
 	}
 	return worker
 }
@@ -37,7 +38,7 @@ func (w *worker) start() {
 				job()
 			case <-w.stop:
 				// 为了确保这个worker关掉后才会关掉下一个
-				w.stop <- true
+				w.stop <- struct{}{}
 				return
 			}
 		}
@@ -48,7 +49,7 @@ func (w *worker) start() {
 type dispatcher struct {
 	workerPool chan *worker
 	jobQueue   chan Job
-	stop       chan bool
+	stop       chan struct{}
 }
 
 // 初始化调度器
@@ -56,7 +57,7 @@ func newDispatcher(workerPool chan *worker, jobQueue chan Job) *dispatcher {
 	dispatcher := &dispatcher{
 		workerPool: workerPool,
 		jobQueue:   jobQueue,
-		stop:       make(chan bool),
+		stop:       make(chan struct{}),
 	}
 	// 根据worker数量声明worker
 	for i := 0; i < cap(workerPool); i++ {
@@ -82,11 +83,11 @@ func (d *dispatcher) dispatch() {
 				// 将worker从线程池弹出
 				worker := <-d.workerPool
 				// 给worker发送stop指令
-				worker.stop <- true
+				worker.stop <- struct{}{}
 				// 阻塞等待确保上一个worker已经关闭
 				<-worker.stop
 			}
-			d.stop <- true
+			d.stop <- struct{}{}
 			return
 		}
 	}
@@ -113,7 +114,7 @@ func NewPool(workerNum int, jobQueueLen int) (pool *Pool) {
 
 // 释放线程池所有资源
 func (p *Pool) Release() {
-	p.dispatcher.stop <- true
+	p.dispatcher.stop <- struct{}{}
 	// 同样为了确保dispatcher资源已经全部释放
 	<-p.dispatcher.stop
 }
